@@ -1,0 +1,36 @@
+global:
+  scrape_interval: 10s
+  evaluation_interval: 10s
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+# dns_sd_configs находит все реплики сервиса (docker compose --scale / deploy.replicas)
+scrape_configs:
+  - job_name: gateway
+    dns_sd_configs:
+      - names: [gateway]
+        type: A
+        port: 4000
+
+  - job_name: subgraphs
+    dns_sd_configs:
+      - names: [repos]
+        type: A
+        port: 4001
+      - names: [news]
+        type: A
+        port: 4002
+      - names: [packages]
+        type: A
+        port: 4003
+
+  - job_name: workers
+    dns_sd_configs:
+      - names: [repos-worker, news-worker, packages-worker]
+        type: A
+        port: 9100
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']

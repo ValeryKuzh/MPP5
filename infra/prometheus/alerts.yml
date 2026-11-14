@@ -1,0 +1,36 @@
+groups:
+  - name: devpulse
+    rules:
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: 'Сервис {{ $labels.instance }} ({{ $labels.job }}) недоступен'
+
+      - alert: HighGraphQLErrorRate
+        expr: sum(rate(graphql_errors_total{service="gateway"}[5m])) / clamp_min(sum(rate(graphql_operation_duration_seconds_count{service="gateway"}[5m])), 0.001) > 0.05
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: 'Более 5% GraphQL-операций завершаются ошибкой'
+
+      - alert: SlowGraphQL
+        expr: histogram_quantile(0.95, sum by (le) (rate(graphql_operation_duration_seconds_bucket{service="gateway"}[5m]))) > 1
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: 'p95 латентности шлюза выше 1 секунды'
+
+      - alert: CircuitBreakerOpen
+        expr: circuit_breaker_state == 2
+        for: 1m
+        labels: { severity: warning }
+        annotations:
+          summary: 'Источник {{ $labels.name }} отключён circuit breaker'
+
+      - alert: SyncFailed
+        expr: increase(sync_runs_total{status="FAILED"}[1h]) > 0
+        labels: { severity: warning }
+        annotations:
+          summary: 'Синхронизация {{ $labels.source }} завершилась ошибкой'

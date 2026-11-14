@@ -1,0 +1,22 @@
+{
+  "name": "devpulse",
+  "version": "1.0.0",
+  "private": true,
+  "description": "DevPulse — GraphQL Federation агрегатор GitHub / Hacker News / npm",
+  "workspaces": [
+    "packages/common",
+    "services/repos",
+    "services/news",
+    "services/packages",
+    "gateway"
+  ],
+  "scripts": {
+    "up": "docker compose up -d --build",
+    "down": "docker compose down",
+    "logs": "docker compose logs -f --tail=100",
+    "check": "node scripts/check-syntax.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

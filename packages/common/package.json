@@ -1,0 +1,30 @@
+{
+  "name": "@devpulse/common",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./tracing": "./src/tracing.js"
+  },
+  "dependencies": {
+    "@apollo/server": "^5.5.2",
+    "@apollo/subgraph": "^2.16.0",
+    "@as-integrations/express5": "^1.1.2",
+    "@opentelemetry/api": "^1.10.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.83.1",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.301.2",
+    "@opentelemetry/sdk-node": "^0.301.2",
+    "bullmq": "^6.7.6",
+    "cors": "^2.8.6",
+    "dataloader": "^2.2.3",
+    "express": "^5.3.0",
+    "graphql": "^16.15.0",
+    "graphql-tag": "^2.12.7",
+    "ioredis": "^6.0.0",
+    "opossum": "^10.0.0",
+    "pg": "^8.23.1",
+    "pino": "^10.4.0",
+    "prom-client": "^15.1.3"
+  }
+}

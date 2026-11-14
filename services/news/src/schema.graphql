@@ -1,0 +1,184 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.5", import: ["@key", "@shareable"])
+
+enum StoryType {
+  STORY
+  SHOW_HN
+  ASK_HN
+}
+
+"Публикация Hacker News"
+type Story @key(fields: "id") {
+  id: ID!
+  title: String!
+  url: String
+  domain: String
+  "Ссылка на обсуждение на news.ycombinator.com"
+  hnUrl: String!
+  author: Author!
+  points: Int!
+  commentCount: Int!
+  createdAt: DateTime!
+  type: StoryType!
+  text: String
+  "Репозиторий GitHub, на который ссылается публикация (резолвится подграфом repos)"
+  repository: Repository
+  "Комментарии верхнего уровня; ответы доступны через Comment.replies (дерево любой глубины)"
+  comments(first: Int, after: String, sort: CommentSort = OLDEST): CommentConnection!
+  "Количество комментариев, загруженных в систему"
+  storedCommentCount: Int!
+}
+
+type Comment @key(fields: "id") {
+  id: ID!
+  author: Author!
+  text: String
+  createdAt: DateTime!
+  depth: Int!
+  story: Story!
+  parent: Comment
+  replyCount: Int!
+  replies(first: Int = 20): [Comment!]!
+}
+
+type Author @key(fields: "name") {
+  name: String!
+  storyCount: Int!
+  commentCount: Int!
+  totalPoints: Int!
+  hnUrl: String!
+  stories(first: Int, after: String, last: Int, before: String, sort: [StorySort!]): StoryConnection!
+  comments(first: Int, after: String): CommentConnection!
+}
+
+# Расширение сущности подграфа repos: обсуждения репозитория на Hacker News
+type Repository @key(fields: "fullName") {
+  fullName: String!
+  hnMentions: Int
+  relatedStories(first: Int = 5, sort: [StorySort!]): [Story!]
+}
+
+# Расширение сущности подграфа repos: публикации по теме (полнотекстовый поиск по названию топика)
+type Topic @key(fields: "name") {
+  name: String!
+  stories(first: Int = 10): [Story!]
+}
+
+type StoryEdge {
+  cursor: String!
+  node: Story!
+}
+
+type StoryConnection {
+  edges: [StoryEdge!]!
+  nodes: [Story!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type CommentEdge {
+  cursor: String!
+  node: Comment!
+}
+
+type CommentConnection {
+  edges: [CommentEdge!]!
+  nodes: [Comment!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+enum CommentSort {
+  OLDEST
+  NEWEST
+}
+
+enum StorySortField {
+  POINTS
+  COMMENTS
+  CREATED_AT
+  RELEVANCE
+}
+
+input StorySort {
+  field: StorySortField!
+  direction: SortDirection = DESC
+}
+
+input StoryFilter {
+  AND: [StoryFilter!]
+  OR: [StoryFilter!]
+  NOT: StoryFilter
+  author: StringFilter
+  domain: StringFilter
+  title: StringFilter
+  points: IntFilter
+  commentCount: IntFilter
+  createdAt: DateFilter
+  type: [StoryType!]
+  "Только публикации со ссылкой на GitHub-репозиторий"
+  hasRepository: Boolean
+}
+
+enum AuthorSortField {
+  TOTAL_POINTS
+  STORY_COUNT
+  COMMENT_COUNT
+  NAME
+}
+
+input AuthorSort {
+  field: AuthorSortField!
+  direction: SortDirection = DESC
+}
+
+type AuthorEdge {
+  cursor: String!
+  node: Author!
+}
+
+type AuthorConnection {
+  edges: [AuthorEdge!]!
+  nodes: [Author!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type DomainStat {
+  domain: String!
+  storyCount: Int!
+  totalPoints: Int!
+}
+
+type NewsStats {
+  totalStories: Int!
+  totalComments: Int!
+  totalAuthors: Int!
+  storiesWithRepository: Int!
+  topDomains(limit: Int = 10): [DomainStat!]!
+  storiesByYear: [YearStat!]!
+}
+
+type Query {
+  story(id: ID!): Story
+  stories(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    filter: StoryFilter
+    sort: [StorySort!]
+    search: String
+  ): StoryConnection!
+  comment(id: ID!): Comment
+  "Поиск по тексту комментариев"
+  comments(first: Int, after: String, search: String!, author: String): CommentConnection!
+  author(name: String!): Author
+  authors(first: Int, after: String, last: Int, before: String, search: String, sort: AuthorSort): AuthorConnection!
+  newsStats: NewsStats!
+  newsSyncRuns(limit: Int = 10): [SyncRun!]!
+}
+
+type Mutation {
+  "Поставить сбор данных из Hacker News в очередь"
+  syncNews: SyncRun!
+}

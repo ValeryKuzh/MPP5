@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+frontend
+infra
+loadtest
+docs
+.git
+.env
+*.md
+supergraph-api.graphql

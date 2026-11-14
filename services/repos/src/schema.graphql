@@ -1,0 +1,232 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.5", import: ["@key", "@shareable"])
+
+"""
+Репозиторий GitHub. Сущность федерации: подграф news добавляет к нему
+обсуждения на Hacker News, подграф packages — опубликованные npm-пакеты.
+"""
+type Repository @key(fields: "fullName") {
+  id: ID!
+  "owner/name"
+  fullName: String!
+  name: String!
+  description: String
+  url: String!
+  homepage: String
+  language: String
+  license: String
+  stars: Int!
+  forks: Int!
+  openIssues: Int!
+  sizeKb: Int!
+  archived: Boolean!
+  isFork: Boolean!
+  createdAt: DateTime!
+  pushedAt: DateTime!
+  owner: Owner!
+  topics: [Topic!]!
+  "Похожие репозитории — с наибольшим числом общих топиков"
+  similar(first: Int = 5): [Repository!]!
+  "Коллекции пользователя, в которые добавлен репозиторий"
+  collections: [Collection!]!
+}
+
+enum OwnerType {
+  USER
+  ORGANIZATION
+}
+
+type Owner @key(fields: "login") {
+  id: ID!
+  login: String!
+  type: OwnerType!
+  avatarUrl: String
+  url: String
+  repositoryCount: Int!
+  totalStars: Int!
+  repositories(first: Int, after: String, last: Int, before: String, sort: [RepositorySort!]): RepositoryConnection!
+}
+
+"Топик GitHub. Сущность федерации: news добавляет обсуждения, packages — npm-пакеты с таким ключевым словом."
+type Topic @key(fields: "name") {
+  name: String!
+  repositoryCount: Int!
+  repositories(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    filter: RepositoryFilter
+    sort: [RepositorySort!]
+  ): RepositoryConnection!
+  "Топики, чаще всего встречающиеся вместе с этим"
+  related(first: Int = 10): [TopicCooccurrence!]!
+}
+
+type TopicCooccurrence {
+  topic: Topic!
+  count: Int!
+}
+
+type RepositoryEdge {
+  cursor: String!
+  node: Repository!
+}
+
+type RepositoryConnection {
+  edges: [RepositoryEdge!]!
+  nodes: [Repository!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type OwnerEdge {
+  cursor: String!
+  node: Owner!
+}
+
+type OwnerConnection {
+  edges: [OwnerEdge!]!
+  nodes: [Owner!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+enum RepositorySortField {
+  STARS
+  FORKS
+  OPEN_ISSUES
+  CREATED_AT
+  PUSHED_AT
+  NAME
+  "Релевантность полнотекстового поиска (только вместе с search)"
+  RELEVANCE
+}
+
+input RepositorySort {
+  field: RepositorySortField!
+  direction: SortDirection = DESC
+}
+
+"""
+Динамический фильтр. Поля объединяются через AND, поддерживается
+произвольная вложенность логических операторов AND / OR / NOT.
+"""
+input RepositoryFilter {
+  AND: [RepositoryFilter!]
+  OR: [RepositoryFilter!]
+  NOT: RepositoryFilter
+  language: StringFilter
+  owner: StringFilter
+  license: StringFilter
+  stars: IntFilter
+  forks: IntFilter
+  openIssues: IntFilter
+  createdAt: DateFilter
+  pushedAt: DateFilter
+  "Репозиторий содержит ВСЕ перечисленные топики"
+  topics: [String!]
+  "Репозиторий содержит ХОТЯ БЫ ОДИН из топиков"
+  anyTopic: [String!]
+  archived: Boolean
+  isFork: Boolean
+}
+
+enum OwnerSortField {
+  TOTAL_STARS
+  REPOSITORY_COUNT
+  LOGIN
+}
+
+input OwnerSort {
+  field: OwnerSortField!
+  direction: SortDirection = DESC
+}
+
+type LanguageStat {
+  language: String!
+  repositoryCount: Int!
+  totalStars: Int!
+  avgStars: Float!
+}
+
+type LicenseStat {
+  license: String!
+  repositoryCount: Int!
+}
+
+type RepositoryStats {
+  totalRepositories: Int!
+  totalOwners: Int!
+  totalTopics: Int!
+  totalStars: Float!
+  byLanguage(limit: Int = 15): [LanguageStat!]!
+  byLicense(limit: Int = 10): [LicenseStat!]!
+  createdByYear: [YearStat!]!
+}
+
+type Collection {
+  id: ID!
+  name: String!
+  description: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  itemCount: Int!
+  items: [CollectionItem!]!
+}
+
+type CollectionItem {
+  repository: Repository!
+  note: String
+  addedAt: DateTime!
+}
+
+input CreateCollectionInput {
+  name: String!
+  description: String
+}
+
+input UpdateCollectionInput {
+  name: String
+  description: String
+}
+
+type Query {
+  repository(fullName: String!): Repository
+  "Список репозиториев: фильтрация, сортировка (до 3 полей), полнотекстовый поиск, курсорная пагинация"
+  repositories(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    filter: RepositoryFilter
+    sort: [RepositorySort!]
+    search: String
+  ): RepositoryConnection!
+  owner(login: String!): Owner
+  owners(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    search: String
+    type: OwnerType
+    sort: OwnerSort
+  ): OwnerConnection!
+  topic(name: String!): Topic
+  topics(first: Int = 50, search: String, minRepositories: Int): [Topic!]!
+  languages: [String!]!
+  repositoryStats: RepositoryStats!
+  collections: [Collection!]!
+  collection(id: ID!): Collection
+  repositorySyncRuns(limit: Int = 10): [SyncRun!]!
+}
+
+type Mutation {
+  createCollection(input: CreateCollectionInput!): Collection!
+  updateCollection(id: ID!, input: UpdateCollectionInput!): Collection!
+  deleteCollection(id: ID!): Boolean!
+  addToCollection(collectionId: ID!, fullName: String!, note: String): Collection!
+  removeFromCollection(collectionId: ID!, fullName: String!): Collection!
+  "Поставить сбор данных из GitHub в очередь"
+  syncRepositories: SyncRun!
+}

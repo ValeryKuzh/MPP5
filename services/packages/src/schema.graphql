@@ -1,0 +1,189 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.5", import: ["@key", "@shareable"])
+
+"npm-пакет"
+type Package @key(fields: "name") {
+  name: String!
+  version: String
+  description: String
+  keywords: [String!]!
+  license: String
+  homepage: String
+  npmUrl: String!
+  repositoryUrl: String
+  publishedAt: DateTime!
+  "Загрузки за последний месяц (Float: значения превышают диапазон Int32)"
+  monthlyDownloads: Float!
+  weeklyDownloads: Float!
+  "Число пакетов npm, зависящих от этого (по данным реестра)"
+  dependentsCount: Int!
+  score: Float!
+  publisher: Maintainer
+  maintainers: [Maintainer!]!
+  "GitHub-репозиторий исходного кода (резолвится подграфом repos)"
+  repository: Repository
+  dependencies(kind: DependencyKind): [Dependency!]!
+  "Пакеты из базы, которые зависят от этого"
+  dependents(first: Int, after: String): PackageConnection!
+}
+
+enum DependencyKind {
+  PROD
+  DEV
+  PEER
+}
+
+type Dependency {
+  name: String!
+  versionRange: String
+  kind: DependencyKind!
+  "Пакет-зависимость, если он есть в базе (позволяет обходить граф зависимостей вглубь)"
+  package: Package
+}
+
+type Maintainer @key(fields: "name") {
+  name: String!
+  packageCount: Int!
+  totalDownloads: Float!
+  npmUrl: String!
+  packages(first: Int, after: String, last: Int, before: String, sort: [PackageSort!]): PackageConnection!
+}
+
+# Расширение сущности подграфа repos
+type Repository @key(fields: "fullName") {
+  fullName: String!
+  packages: [Package!]
+}
+
+# Расширение сущности подграфа repos: пакеты с соответствующим ключевым словом
+type Topic @key(fields: "name") {
+  name: String!
+  packageCount: Int
+  packages(first: Int = 10): [Package!]
+}
+
+type PackageEdge {
+  cursor: String!
+  node: Package!
+}
+
+type PackageConnection {
+  edges: [PackageEdge!]!
+  nodes: [Package!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type MaintainerEdge {
+  cursor: String!
+  node: Maintainer!
+}
+
+type MaintainerConnection {
+  edges: [MaintainerEdge!]!
+  nodes: [Maintainer!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+enum PackageSortField {
+  DOWNLOADS
+  DEPENDENTS
+  PUBLISHED_AT
+  SCORE
+  NAME
+  RELEVANCE
+}
+
+input PackageSort {
+  field: PackageSortField!
+  direction: SortDirection = DESC
+}
+
+input FloatFilter {
+  eq: Float
+  ne: Float
+  gt: Float
+  gte: Float
+  lt: Float
+  lte: Float
+}
+
+input PackageFilter {
+  AND: [PackageFilter!]
+  OR: [PackageFilter!]
+  NOT: PackageFilter
+  name: StringFilter
+  license: StringFilter
+  monthlyDownloads: FloatFilter
+  dependentsCount: IntFilter
+  publishedAt: DateFilter
+  "Пакет содержит ВСЕ ключевые слова"
+  keywords: [String!]
+  "Пакет содержит ХОТЯ БЫ ОДНО ключевое слово"
+  anyKeyword: [String!]
+  maintainer: String
+  hasRepository: Boolean
+  "Пакет зависит от указанного пакета"
+  dependsOn: String
+}
+
+enum MaintainerSortField {
+  TOTAL_DOWNLOADS
+  PACKAGE_COUNT
+  NAME
+}
+
+input MaintainerSort {
+  field: MaintainerSortField!
+  direction: SortDirection = DESC
+}
+
+type DependencyUsage {
+  name: String!
+  dependentCount: Int!
+  package: Package
+}
+
+type KeywordStat {
+  keyword: String!
+  packageCount: Int!
+}
+
+type LicenseShare {
+  license: String!
+  packageCount: Int!
+}
+
+type PackageStats {
+  totalPackages: Int!
+  totalMaintainers: Int!
+  totalDependencies: Int!
+  totalMonthlyDownloads: Float!
+  topKeywords(limit: Int = 20): [KeywordStat!]!
+  byLicense(limit: Int = 10): [LicenseShare!]!
+  "Самые используемые зависимости среди пакетов в базе"
+  mostDependedUpon(limit: Int = 10): [DependencyUsage!]!
+  publishedByYear: [YearStat!]!
+}
+
+type Query {
+  package(name: String!): Package
+  packages(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    filter: PackageFilter
+    sort: [PackageSort!]
+    search: String
+  ): PackageConnection!
+  maintainer(name: String!): Maintainer
+  maintainers(first: Int, after: String, search: String, sort: MaintainerSort): MaintainerConnection!
+  packageStats: PackageStats!
+  packageSyncRuns(limit: Int = 10): [SyncRun!]!
+}
+
+type Mutation {
+  "Поставить сбор данных из npm в очередь"
+  syncPackages: SyncRun!
+}
