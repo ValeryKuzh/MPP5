@@ -3,3 +3,4 @@ dist/
 .env
 supergraph-api.graphql
 *.log
+.idea/
